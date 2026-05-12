@@ -3,11 +3,16 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
 	test: {
-		include: ["src/sdk/**/*.test.ts", "src/core/controller/models/__tests__/providerCatalogHandlers.test.ts"],
+		include: [
+			"src/sdk/**/*.test.ts",
+			"src/core/controller/models/__tests__/providerCatalogHandlers.test.ts",
+			"src/core/controller/models/__tests__/providerCatalogSmoke.test.ts",
+		],
 		environment: "node",
 	},
 	resolve: {
 		alias: {
+			vscode: path.resolve(__dirname, "src/test/vscode-vitest-stub.ts"),
 			"@": path.resolve(__dirname, "src"),
 			"@api": path.resolve(__dirname, "src/core/api"),
 			"@core": path.resolve(__dirname, "src/core"),
