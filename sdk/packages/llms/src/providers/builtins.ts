@@ -20,6 +20,7 @@ import {
 	ANTHROPIC_ROUTING_METADATA,
 	QWEN_CACHE_ROUTING_METADATA,
 } from "./routing/anthropic-compatible";
+import { GLM_THINKING_ROUTING_METADATA } from "./routing/glm-thinking";
 
 export const DEFAULT_INTERNAL_OCA_BASE_URL =
 	"https://code-internal.aiservice.us-chicago-1.oci.oraclecloud.com/20250206/app/litellm";
@@ -500,6 +501,7 @@ const OPENAI_COMPATIBLE_SPECS: BuiltinSpec[] = [
 		apiKeyEnv: ["ZHIPU_API_KEY"],
 		modelsProviderId: "zai",
 		defaults: { baseUrl: "https://api.z.ai/api/paas/v4" },
+		metadata: GLM_THINKING_ROUTING_METADATA,
 	},
 	{
 		id: "zai-coding-plan",
@@ -511,6 +513,7 @@ const OPENAI_COMPATIBLE_SPECS: BuiltinSpec[] = [
 		apiKeyEnv: ["ZHIPU_API_KEY"],
 		modelsProviderId: "zai-coding-plan",
 		defaults: { baseUrl: "https://api.z.ai/api/coding/paas/v4" },
+		metadata: GLM_THINKING_ROUTING_METADATA,
 	},
 	{
 		id: "moonshot",
