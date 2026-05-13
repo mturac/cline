@@ -1,6 +1,6 @@
-# Multi-Agent Fan-Out
+# Agent War Room
 
-A web app that spawns three specialist agents in parallel, streams their responses to the browser in real time via SSE, then feeds their findings into a synthesizer agent that produces a unified answer.
+A web app that turns multi-agent fan-out into a visual war room. Four specialist agents debate a mission in parallel, stream their responses to the browser in real time via SSE, then feed their findings into a synthesizer agent that produces a decision brief.
 
 ## Getting started
 
@@ -23,17 +23,18 @@ Run:
 bun dev
 ```
 
-Open http://localhost:3456 in your browser, enter a topic, and watch the agents work.
+Open http://localhost:3456 in your browser, enter a mission, and watch the agents work.
 
 ## What it does
 
-1. You enter a topic in the browser
-2. The server spawns three `Agent` instances in parallel via `Promise.all`:
-   - Technical Expert (engineering perspective)
-   - Practical Analyst (real-world applications)
-   - Critical Reviewer (limitations and trade-offs)
-3. Each agent streams `assistant-text-delta` events to the browser via SSE, rendered in its own card
-4. Once all three finish, a fourth synthesizer agent combines their findings into a unified answer, also streamed live
+1. You enter a mission in the browser
+2. The server spawns four `Agent` instances in parallel via `Promise.all`:
+   - Architect (system design and implementation path)
+   - Security Analyst (data access, permissions, privacy, and operational risk)
+   - Pragmatist (user value, cost, integration burden, and launch path)
+   - Skeptic (assumption checks, failure modes, and simpler alternatives)
+3. Each agent streams `assistant-text-delta` events to the browser via SSE, rendered in its own live console card
+4. Once all four finish, a synthesizer agent combines their findings into a compact decision brief, also streamed live
 
 ## Concepts demonstrated
 
@@ -42,6 +43,7 @@ Open http://localhost:3456 in your browser, enter a topic, and watch the agents 
 - Server-Sent Events (SSE) to stream agent output to a browser
 - Agent composition: feeding one agent's output as input to another
 - Inline HTML frontend served from the same Node.js server (single file, no build step)
+- Visual demo design: a dashboard-style agent console with live streams, telemetry, and a recommendation panel
 
 ## Notes
 
