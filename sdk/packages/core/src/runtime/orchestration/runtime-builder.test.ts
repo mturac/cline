@@ -8,6 +8,7 @@ import {
 	type Message,
 } from "@cline/shared";
 import { afterEach, describe, expect, it } from "vitest";
+import { MAX_RUN_COMMANDS_TIMEOUT_MS } from "../../extensions/tools/schemas";
 import { TelemetryService } from "../../services/telemetry/TelemetryService";
 import type { CoreSessionConfig } from "../../types/config";
 import { DefaultRuntimeBuilder } from "./runtime-builder";
@@ -292,10 +293,10 @@ describe("DefaultRuntimeBuilder", () => {
 
 		const runtime = await new DefaultRuntimeBuilder().build({
 			config: makeBaseConfig(),
-		});
-		const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
-		expect(runCommandsTool).toBeDefined();
-		expect(runCommandsTool?.timeoutMs).toBe(240000);
+	});
+	const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
+	expect(runCommandsTool).toBeDefined();
+	expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
 	});
 
 	it("defaults invalid runCommandsTimeoutMs in global settings to 30000", async () => {
@@ -310,10 +311,10 @@ describe("DefaultRuntimeBuilder", () => {
 
 		const runtime = await new DefaultRuntimeBuilder().build({
 			config: makeBaseConfig(),
-		});
-		const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
-		expect(runCommandsTool?.timeoutMs).toBe(60000);
 	});
+	const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
+	expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
+});
 
 	it("adds spawn tool when enabled", async () => {
 		const runtime = await new DefaultRuntimeBuilder().build({
