@@ -5,6 +5,7 @@ export default defineConfig({
 	test: {
 		include: [
 			"src/sdk/**/*.test.ts",
+			"src/shared/model-catalog/provider-helpers.test.ts",
 			"src/core/controller/models/__tests__/providerCatalogHandlers.test.ts",
 			"src/core/controller/models/__tests__/providerSwitchNormalization.test.ts",
 			"src/core/controller/models/__tests__/resolveModelInfo.test.ts",
