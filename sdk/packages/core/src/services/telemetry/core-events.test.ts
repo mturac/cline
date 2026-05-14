@@ -539,6 +539,24 @@ describe("telemetry policy: helpers respect telemetry opt-out", () => {
 		expect(emitRequired).not.toHaveBeenCalled();
 	});
 
+	test("captureRunCommandsTimeout never invokes captureRequired", () => {
+		const { adapter, emitRequired } = createDisabledAdapter();
+		const service = new TelemetryService({
+			distinctId: "test-distinct-id",
+			adapters: [adapter],
+		});
+		captureRunCommandsTimeout(service, {
+			tool_name: "run_commands",
+			effective_timeout_ms: 1500,
+			timeout_source: "tool_parameter",
+			command_count: 2,
+			command_index: 1,
+			duration_ms: 1502,
+			timeout_origin: "wrapper",
+		});
+		expect(emitRequired).not.toHaveBeenCalled();
+	});
+
 	test("a correctly-policed adapter drops these events when disabled", () => {
 		// This test layers on top of the previous four to assert the *full*
 		// end-to-end policy: when the adapter is disabled, a real adapter
@@ -610,6 +628,15 @@ describe("telemetry policy: helpers respect telemetry opt-out", () => {
 			thresholdRatio: 0.9,
 			durationMs: 17,
 		});
+		captureRunCommandsTimeout(service, {
+			tool_name: "run_commands",
+			effective_timeout_ms: 1500,
+			timeout_source: "tool_parameter",
+			command_count: 2,
+			command_index: 1,
+			duration_ms: 1502,
+			timeout_origin: "wrapper",
+		});
 		expect(observed).toEqual([]);
 		expect(dropped).toEqual([
 			"user.extension_activated",
@@ -619,6 +646,7 @@ describe("telemetry policy: helpers respect telemetry opt-out", () => {
 			"user.provider_configured",
 			"task.compaction_executed",
 			"task.compaction_skipped",
+			"sdk.tool_timeout",
 		]);
 	});
 });

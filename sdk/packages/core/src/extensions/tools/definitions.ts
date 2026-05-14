@@ -8,6 +8,7 @@ import {
 	type AgentToolContext,
 	type AgentTool,
 	createTool,
+	type ITelemetryService,
 	validateWithZod,
 	zodToJsonSchema,
 } from "@cline/shared";
@@ -44,6 +45,7 @@ import {
 	type SkillsInput,
 	SkillsInputSchema,
 	type StructuredCommandInput,
+	type StructuredCommandsInput,
 	StructuredCommandsInputSchema,
 	StructuredCommandsInputUnionSchema,
 	MAX_RUN_COMMANDS_TIMEOUT_MS,
@@ -233,6 +235,21 @@ function getRunCommandsTimeoutSource(
 		: "default_setting";
 }
 
+function getTelemetryFromMetadata(
+	metadata: AgentToolContext["metadata"],
+): ITelemetryService | undefined {
+	const telemetry = metadata?.telemetry;
+	if (!telemetry || typeof telemetry !== "object") {
+		return undefined;
+	}
+
+	const candidate = telemetry as Partial<ITelemetryService>;
+	return typeof candidate.capture === "function" &&
+		typeof candidate.captureRequired === "function"
+		? (telemetry as ITelemetryService)
+		: undefined;
+}
+
 function captureRunCommandsTimeoutFromContext(
 	context: AgentToolContext,
 	properties: {
@@ -244,7 +261,7 @@ function captureRunCommandsTimeoutFromContext(
 		timeoutOrigin: "wrapper" | "executor";
 	},
 ): void {
-	captureRunCommandsTimeout((context.metadata?.telemetry as never) ?? undefined, {
+	captureRunCommandsTimeout(getTelemetryFromMetadata(context.metadata), {
 		tool_name: "run_commands",
 		effective_timeout_ms: properties.effectiveTimeoutMs,
 		timeout_source: properties.timeoutSource,
@@ -365,11 +382,11 @@ export function createBashTool(
 export function createWindowsShellTool(
 	executor: BashExecutor,
 	config: Pick<DefaultToolsConfig, "cwd" | "bashTimeoutMs"> = {},
-): AgentTool<StructuredCommandInput, ToolOperationResult[]> {
+): AgentTool<StructuredCommandsInput, ToolOperationResult[]> {
 	const defaultTimeoutMs = config.bashTimeoutMs ?? 30000;
 	const cwd = config.cwd ?? process.cwd();
 
-	return createTool<StructuredCommandInput, ToolOperationResult[]>({
+	return createTool<StructuredCommandsInput, ToolOperationResult[]>({
 		name: "run_commands",
 		description:
 			"Run shell commands from the root of the workspace in a Windows environment. " +
