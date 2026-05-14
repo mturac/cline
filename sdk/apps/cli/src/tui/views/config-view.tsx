@@ -269,10 +269,11 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 				label: "Auto-approve all",
 			});
 			r.push({ kind: "toggle", id: "verbose", label: "Verbose" });
+		} else if (activeTab === "advanced") {
 			r.push({
 				kind: "toggle",
 				id: "run-commands-timeout",
-				label: `run_commands timeout (${runCommandsTimeoutMs} ms)`,
+				label: "Run Command timeout",
 			});
 		} else {
 			const activeItems = resolveActiveConfigItems(configData, activeTab);
@@ -555,6 +556,9 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 						} else if (row.id === "compaction") {
 							value = formatCliCompactionMode(compactionMode);
 							valueColor = COMPACTION_MODE_COLORS[compactionMode];
+						} else if (row.id === "run-commands-timeout") {
+							value = `${runCommandsTimeoutMs / 1000}s`;
+							valueColor = "white";
 						} else {
 							value = verbose ? "● on" : "○ off";
 							valueColor = verbose ? palette.success : "gray";

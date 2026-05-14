@@ -24,6 +24,7 @@ export interface InteractiveGeneralConfig {
 
 export type InteractiveConfigTab =
 	| "general"
+	| "advanced"
 	| "tools"
 	| "workflows"
 	| "agents"
