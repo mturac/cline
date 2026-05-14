@@ -126,6 +126,7 @@ export interface ConfigPanelProps extends ChoiceContext<ConfigAction> {
 	onToggleMode: () => void;
 	onToggleAutoApprove: () => void;
 	onSetCompactionMode: (mode: CliCompactionMode) => void;
+	onSetRunCommandsTimeoutMs: (value: number) => void;
 }
 
 function groupToolItems(
@@ -242,6 +243,9 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 	const [compactionMode, setCompactionMode] = useState(
 		props.currentCompactionMode,
 	);
+	const [runCommandsTimeoutMs, setRunCommandsTimeoutMs] = useState(
+		configData.general.runCommandsTimeoutMs,
+	);
 	const [activeTab, setActiveTab] = useState<InteractiveConfigTab>("general");
 	const [configData, setConfigData] = useState(props.configData);
 	const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
@@ -264,6 +268,11 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 				label: "Auto-approve all",
 			});
 			r.push({ kind: "toggle", id: "verbose", label: "Verbose" });
+			r.push({
+				kind: "toggle",
+				id: "run-commands-timeout",
+				label: `run_commands timeout (${runCommandsTimeoutMs} ms)`,
+			});
 		} else {
 			const activeItems = resolveActiveConfigItems(configData, activeTab);
 			r.push({
@@ -298,7 +307,7 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 		}
 
 		return r;
-	}, [activeTab, configData]);
+	}, [activeTab, configData, runCommandsTimeoutMs]);
 
 	const navIndices = useMemo(
 		() => rows.map((r, i) => (isNavigable(r) ? i : -1)).filter((i) => i >= 0),
@@ -359,6 +368,12 @@ export function ConfigPanelContent(props: ConfigPanelProps) {
 						config.verbose = !verbose;
 						setVerbose(!verbose);
 						break;
+					case "run-commands-timeout": {
+						const nextTimeoutMs = runCommandsTimeoutMs === 30000 ? 120000 : 30000;
+						setRunCommandsTimeoutMs(nextTimeoutMs);
+						props.onSetRunCommandsTimeoutMs(nextTimeoutMs);
+						break;
+					}
 				}
 				break;
 			case "ext": {

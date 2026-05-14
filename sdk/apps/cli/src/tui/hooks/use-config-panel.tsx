@@ -20,6 +20,7 @@ export function useConfigPanel(opts: {
 	toggleMode: () => void;
 	toggleAutoApprove: () => void;
 	setCompactionMode: (mode: CliCompactionMode) => void;
+	setRunCommandsTimeoutMs: (value: number) => void;
 	termHeight: number;
 	loadConfigData: () => Promise<InteractiveConfigData>;
 	onToggleConfigItem?: (
@@ -31,6 +32,7 @@ export function useConfigPanel(opts: {
 }) {
 	const emptyConfigData = useMemo(
 		() => ({
+			general: { runCommandsTimeoutMs: 30000 },
 			workflows: [] as InteractiveConfigItem[],
 			rules: [] as InteractiveConfigItem[],
 			skills: [] as InteractiveConfigItem[],
@@ -67,6 +69,7 @@ export function useConfigPanel(opts: {
 						onToggleMode={opts.toggleMode}
 						onToggleAutoApprove={opts.toggleAutoApprove}
 						onSetCompactionMode={opts.setCompactionMode}
+						onSetRunCommandsTimeoutMs={opts.setRunCommandsTimeoutMs}
 					/>
 				),
 			});
