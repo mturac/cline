@@ -44,7 +44,6 @@ import {
 	SearchCodebaseUnionInputSchema,
 	type SkillsInput,
 	SkillsInputSchema,
-	type StructuredCommandInput,
 	type StructuredCommandsInput,
 	StructuredCommandsInputSchema,
 	StructuredCommandsInputUnionSchema,
