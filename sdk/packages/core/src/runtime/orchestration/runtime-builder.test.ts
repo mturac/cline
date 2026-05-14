@@ -281,7 +281,7 @@ describe("DefaultRuntimeBuilder", () => {
 		expect(names).toContain("read_files");
 	});
 
-	it("uses runCommandsTimeoutMs from global settings for run_commands tool and executor", async () => {
+	it("sets outer tool timeoutMs to MAX_RUN_COMMANDS_TIMEOUT_MS regardless of configured runCommandsTimeoutMs", async () => {
 		const tempRoot = mkdtempSync(join(tmpdir(), "runtime-builder-timeout-"));
 		const settingsPath = join(tempRoot, "global-settings.json");
 		process.env.CLINE_GLOBAL_SETTINGS_PATH = settingsPath;
@@ -293,10 +293,12 @@ describe("DefaultRuntimeBuilder", () => {
 
 		const runtime = await new DefaultRuntimeBuilder().build({
 			config: makeBaseConfig(),
-	});
-	const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
-	expect(runCommandsTool).toBeDefined();
-	expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
+		});
+		const runCommandsTool = runtime.tools.find(
+			(tool) => tool.name === "run_commands",
+		);
+		expect(runCommandsTool).toBeDefined();
+		expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
 	});
 
 	it("defaults invalid runCommandsTimeoutMs in global settings to 30000", async () => {
@@ -311,10 +313,12 @@ describe("DefaultRuntimeBuilder", () => {
 
 		const runtime = await new DefaultRuntimeBuilder().build({
 			config: makeBaseConfig(),
+		});
+		const runCommandsTool = runtime.tools.find(
+			(tool) => tool.name === "run_commands",
+		);
+		expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
 	});
-	const runCommandsTool = runtime.tools.find((tool) => tool.name === "run_commands");
-	expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
-});
 
 	it("adds spawn tool when enabled", async () => {
 		const runtime = await new DefaultRuntimeBuilder().build({
