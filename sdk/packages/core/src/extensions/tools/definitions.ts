@@ -5,11 +5,13 @@
  */
 
 import {
+	type AgentToolContext,
 	type AgentTool,
 	createTool,
 	validateWithZod,
 	zodToJsonSchema,
 } from "@cline/shared";
+import { captureRunCommandsTimeout } from "../../services/telemetry/core-events";
 import {
 	formatError,
 	formatReadFileQuery,
@@ -197,6 +199,76 @@ export function createSearchTool(
 	});
 }
 
+const RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX =
+	" (effective timeout for this run_commands call)";
+
+function isRunCommandsTimeoutError(error: unknown, timeoutMs: number): boolean {
+	return (
+		error instanceof Error &&
+		(error.message === `Command timed out after ${timeoutMs}ms` ||
+			error.message ===
+				`Command timed out after ${timeoutMs}ms${RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX}`)
+	);
+}
+
+function getTimeoutOrigin(
+	error: unknown,
+	timeoutMs: number,
+): "wrapper" | "executor" {
+	return error instanceof Error &&
+		error.message === `Command timed out after ${timeoutMs}ms`
+		? "executor"
+		: "wrapper";
+}
+
+function getRunCommandsTimeoutSource(
+	input: unknown,
+): "default_setting" | "tool_parameter" {
+	return typeof input === "object" &&
+		input !== null &&
+		!Array.isArray(input) &&
+		"timeout" in input &&
+		(input as { timeout?: number }).timeout !== undefined
+		? "tool_parameter"
+		: "default_setting";
+}
+
+function captureRunCommandsTimeoutFromContext(
+	context: AgentToolContext,
+	properties: {
+		effectiveTimeoutMs: number;
+		timeoutSource: "default_setting" | "tool_parameter";
+		commandCount: number;
+		commandIndex: number;
+		durationMs: number;
+		timeoutOrigin: "wrapper" | "executor";
+	},
+): void {
+	captureRunCommandsTimeout((context.metadata?.telemetry as never) ?? undefined, {
+		tool_name: "run_commands",
+		effective_timeout_ms: properties.effectiveTimeoutMs,
+		timeout_source: properties.timeoutSource,
+		command_count: properties.commandCount,
+		command_index: properties.commandIndex,
+		duration_ms: properties.durationMs,
+		timeout_origin: properties.timeoutOrigin,
+		mode:
+			typeof context.metadata?.mode === "string"
+				? context.metadata.mode
+				: undefined,
+		source:
+			typeof context.metadata?.source === "string"
+				? context.metadata.source
+				: undefined,
+		session_id: context.sessionId,
+		agent_id: context.agentId,
+		conversation_id: context.conversationId,
+		run_id: context.runId,
+		iteration: context.iteration,
+		tool_call_id: context.toolCallId,
+	});
+}
+
 /**
  * Create the run_commands tool
  *
@@ -223,7 +295,10 @@ export function createBashTool(
 		maxRetries: 0,
 		execute: async (input, context) => {
 			const validate = validateWithZod(RunCommandsInputUnionSchema, input);
-			const timeoutMs = resolveRunCommandsTimeoutMs(validate, defaultTimeoutMs);
+			const effectiveTimeoutMs = resolveRunCommandsTimeoutMs(
+				validate,
+				defaultTimeoutMs,
+			);
 			let commands: string[];
 			if (typeof validate === "string") {
 				commands = [validate];
@@ -238,30 +313,45 @@ export function createBashTool(
 			} else {
 				commands = [validate.cmd];
 			}
+			const timeoutSource = getRunCommandsTimeoutSource(validate);
 
 			return Promise.all(
-				commands.map(async (command: string): Promise<ToolOperationResult> => {
-					try {
-						const output = await withTimeout(
-							executor(command, cwd, context, timeoutMs),
-							timeoutMs,
-							`Command timed out after ${timeoutMs}ms (effective timeout for this run_commands call)`,
-						);
-						return {
-							query: command,
-							result: output,
-							success: true,
-						};
-					} catch (error) {
-						const msg = formatError(error);
-						return {
-							query: command,
-							result: "",
-							error: `Command failed: ${msg}`,
-							success: false,
-						};
-					}
-				}),
+				commands.map(
+					async (command: string, commandIndex): Promise<ToolOperationResult> => {
+						const startedAt = Date.now();
+						try {
+							const output = await withTimeout(
+								executor(command, cwd, context, effectiveTimeoutMs),
+								effectiveTimeoutMs,
+								`Command timed out after ${effectiveTimeoutMs}ms${RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX}`,
+							);
+							return {
+								query: command,
+								result: output,
+								success: true,
+							};
+						} catch (error) {
+							const durationMs = Date.now() - startedAt;
+							if (isRunCommandsTimeoutError(error, effectiveTimeoutMs)) {
+								captureRunCommandsTimeoutFromContext(context, {
+									effectiveTimeoutMs,
+									timeoutSource,
+									commandCount: commands.length,
+									commandIndex,
+									durationMs,
+									timeoutOrigin: getTimeoutOrigin(error, effectiveTimeoutMs),
+								});
+							}
+							const msg = formatError(error);
+							return {
+								query: command,
+								result: "",
+								error: `Command failed: ${msg}`,
+								success: false,
+							};
+						}
+					},
+				),
 			);
 		},
 	});
@@ -292,32 +382,50 @@ export function createWindowsShellTool(
 		maxRetries: 0,
 		execute: async (input, context) => {
 			const validate = validateWithZod(StructuredCommandsInputUnionSchema, input);
-			const timeoutMs = resolveRunCommandsTimeoutMs(validate, defaultTimeoutMs);
+			const effectiveTimeoutMs = resolveRunCommandsTimeoutMs(
+				validate,
+				defaultTimeoutMs,
+			);
 			const commands = normalizeValidatedRunCommandsInput(validate);
+			const timeoutSource = getRunCommandsTimeoutSource(validate);
 
 			return Promise.all(
-				commands.map(async (command): Promise<ToolOperationResult> => {
-					try {
-						const output = await withTimeout(
-							executor(command, cwd, context, timeoutMs),
-							timeoutMs,
-							`Command timed out after ${timeoutMs}ms (effective timeout for this run_commands call)`,
-						);
-						return {
-							query: formatRunCommandQuery(command),
-							result: output,
-							success: true,
-						};
-					} catch (error) {
-						const msg = formatError(error);
-						return {
-							query: formatRunCommandQuery(command),
-							result: "",
-							error: `Command failed: ${msg}`,
-							success: false,
-						};
-					}
-				}),
+				commands.map(
+					async (command, commandIndex): Promise<ToolOperationResult> => {
+						const startedAt = Date.now();
+						try {
+							const output = await withTimeout(
+								executor(command, cwd, context, effectiveTimeoutMs),
+								effectiveTimeoutMs,
+								`Command timed out after ${effectiveTimeoutMs}ms${RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX}`,
+							);
+							return {
+								query: formatRunCommandQuery(command),
+								result: output,
+								success: true,
+							};
+						} catch (error) {
+							const durationMs = Date.now() - startedAt;
+							if (isRunCommandsTimeoutError(error, effectiveTimeoutMs)) {
+								captureRunCommandsTimeoutFromContext(context, {
+									effectiveTimeoutMs,
+									timeoutSource,
+									commandCount: commands.length,
+									commandIndex,
+									durationMs,
+									timeoutOrigin: getTimeoutOrigin(error, effectiveTimeoutMs),
+								});
+							}
+							const msg = formatError(error);
+							return {
+								query: formatRunCommandQuery(command),
+								result: "",
+								error: `Command failed: ${msg}`,
+								success: false,
+							};
+						}
+					},
+				),
 			);
 		},
 	});
