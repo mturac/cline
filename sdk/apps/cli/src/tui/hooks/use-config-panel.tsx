@@ -1,4 +1,4 @@
-import { Llms } from "@cline/core";
+import { Llms, readGlobalSettings } from "@cline/core";
 import type { ChoiceContext } from "@opentui-ui/dialog";
 import type { DialogActions } from "@opentui-ui/dialog/react";
 import { useCallback, useMemo } from "react";
@@ -32,7 +32,9 @@ export function useConfigPanel(opts: {
 }) {
 	const emptyConfigData = useMemo(
 		() => ({
-			general: { runCommandsTimeoutMs: 30000 },
+			general: {
+				runCommandsTimeoutMs: readGlobalSettings().runCommandsTimeoutMs ?? 30000,
+			},
 			workflows: [] as InteractiveConfigItem[],
 			rules: [] as InteractiveConfigItem[],
 			skills: [] as InteractiveConfigItem[],
