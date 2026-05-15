@@ -22,6 +22,32 @@ Tools are functions the model can call during execution. Tools consist of a name
 | `ask_question` | Ask the user for input |
 | `submit_and_exit` | Submit a final answer and stop |
 
+### `run_commands` timeout
+
+`run_commands` accepts an optional top-level `timeout` in milliseconds. It applies to the entire tool call and is passed to both the SDK timeout wrapper and the command executor.
+
+```json
+{
+  "commands": ["bun install"],
+  "timeout": 120000
+}
+```
+
+Defaults and bounds:
+
+- default: `30000` ms
+- maximum: `2147483647` ms
+- type: positive integer
+- scope: top-level only
+
+Do not put `timeout` on individual command entries. Per-command timeout is not supported:
+
+```json
+{
+  "commands": [{ "command": "bun", "args": ["install"], "timeout": 120000 }]
+}
+```
+
 ### `run_commands` timeout telemetry
 
 When the built-in `run_commands` tool hits a timeout, the SDK emits a dedicated telemetry event:
@@ -34,7 +60,7 @@ When the built-in `run_commands` tool hits a timeout, the SDK emits a dedicated 
 - `command_index`: zero-based index when the timeout is attributable to one command
 - `duration_ms`: observed duration before timeout handling
 - `timeout_origin`: `wrapper` or `executor`
-- optional context when available: `mode`, `source`, `session_id`, `agent_id`, `conversation_id`, `run_id`, `iteration`, `tool_call_id`
+- optional context when available: `session_id`, `agent_id`, `conversation_id`, `run_id`, `iteration`, `tool_call_id`
 
 Privacy note:
 
@@ -54,9 +80,7 @@ Example payload:
     "command_count": 2,
     "command_index": 1,
     "duration_ms": 5004,
-    "timeout_origin": "wrapper",
-    "mode": "act",
-    "source": "cli"
+    "timeout_origin": "wrapper"
   }
 }
 ```

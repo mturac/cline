@@ -22,6 +22,7 @@ import {
 	normalizeReadFileRequests,
 	normalizeValidatedRunCommandsInput,
 	resolveRunCommandsTimeoutMs,
+	TimeoutError,
 	withTimeout,
 } from "./helpers";
 import {
@@ -203,20 +204,15 @@ export function createSearchTool(
 const RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX =
 	" (effective timeout for this run_commands call)";
 
-function isRunCommandsTimeoutError(error: unknown, timeoutMs: number): boolean {
-	return (
-		error instanceof Error &&
-		(error.message === `Command timed out after ${timeoutMs}ms` ||
-			error.message ===
-				`Command timed out after ${timeoutMs}ms${RUN_COMMANDS_WRAPPER_TIMEOUT_SUFFIX}`)
-	);
+function isRunCommandsTimeoutError(error: unknown): boolean {
+	return error instanceof TimeoutError;
 }
 
 function getTimeoutOrigin(
 	error: unknown,
 	timeoutMs: number,
 ): "wrapper" | "executor" {
-	return error instanceof Error &&
+	return error instanceof TimeoutError &&
 		error.message === `Command timed out after ${timeoutMs}ms`
 		? "executor"
 		: "wrapper";
@@ -268,14 +264,6 @@ function captureRunCommandsTimeoutFromContext(
 		command_index: properties.commandIndex,
 		duration_ms: properties.durationMs,
 		timeout_origin: properties.timeoutOrigin,
-		mode:
-			typeof context.metadata?.mode === "string"
-				? context.metadata.mode
-				: undefined,
-		source:
-			typeof context.metadata?.source === "string"
-				? context.metadata.source
-				: undefined,
 		session_id: context.sessionId,
 		agent_id: context.agentId,
 		conversation_id: context.conversationId,
@@ -330,6 +318,7 @@ export function createBashTool(
 				commands = [validate.cmd];
 			}
 			const timeoutSource = getRunCommandsTimeoutSource(validate);
+			let capturedTimeoutTelemetry = false;
 
 			return Promise.all(
 				commands.map(
@@ -348,7 +337,11 @@ export function createBashTool(
 							};
 						} catch (error) {
 							const durationMs = Date.now() - startedAt;
-							if (isRunCommandsTimeoutError(error, effectiveTimeoutMs)) {
+							if (
+								isRunCommandsTimeoutError(error) &&
+								!capturedTimeoutTelemetry
+							) {
+								capturedTimeoutTelemetry = true;
 								captureRunCommandsTimeoutFromContext(context, {
 									effectiveTimeoutMs,
 									timeoutSource,
@@ -404,6 +397,7 @@ export function createWindowsShellTool(
 			);
 			const commands = normalizeValidatedRunCommandsInput(validate);
 			const timeoutSource = getRunCommandsTimeoutSource(validate);
+			let capturedTimeoutTelemetry = false;
 
 			return Promise.all(
 				commands.map(
@@ -422,7 +416,11 @@ export function createWindowsShellTool(
 							};
 						} catch (error) {
 							const durationMs = Date.now() - startedAt;
-							if (isRunCommandsTimeoutError(error, effectiveTimeoutMs)) {
+							if (
+								isRunCommandsTimeoutError(error) &&
+								!capturedTimeoutTelemetry
+							) {
+								capturedTimeoutTelemetry = true;
 								captureRunCommandsTimeoutFromContext(context, {
 									effectiveTimeoutMs,
 									timeoutSource,
