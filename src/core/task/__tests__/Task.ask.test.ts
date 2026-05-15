@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert"
 import * as NotificationHook from "@core/hooks/notification-hook"
 import { Task } from "@core/task"
 import type { ClineMessage } from "@shared/ExtensionMessage"
+import type { ClineContent } from "@shared/messages/content"
 import { describe, it } from "mocha"
 import sinon from "sinon"
 
@@ -42,6 +43,31 @@ function createFakeTask(taskState: {
 }
 
 describe("Task.ask", () => {
+	it("resets consecutive mistakes when starting a new user turn", async () => {
+		const taskState = {
+			abort: false,
+			consecutiveMistakeCount: 2,
+		}
+		const recursivelyMakeClineRequests = sinon.stub().callsFake(async () => {
+			assert.equal(taskState.consecutiveMistakeCount, 0)
+			return true
+		})
+		const fakeTask = {
+			taskState,
+			recursivelyMakeClineRequests,
+		}
+		const userContent: ClineContent[] = [{ type: "text", text: "continue" }]
+
+		await (
+			Task.prototype as unknown as {
+				initiateTaskLoop: (userContent: ClineContent[]) => Promise<void>
+			}
+		).initiateTaskLoop.call(fakeTask, userContent)
+
+		assert.equal(recursivelyMakeClineRequests.calledOnceWithExactly(userContent, true), true)
+		assert.equal(taskState.consecutiveMistakeCount, 0)
+	})
+
 	it("keeps resume asks waiting for a user response even when the task is aborted", async () => {
 		const clock = sinon.useFakeTimers()
 		const taskState: {

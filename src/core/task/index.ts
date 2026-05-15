@@ -1451,6 +1451,7 @@ export class Task {
 	}
 
 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {
+		this.taskState.consecutiveMistakeCount = 0
 		let nextUserContent = userContent
 		let includeFileDetails = true
 		while (!this.taskState.abort) {
