@@ -466,7 +466,7 @@ function buildGatewayConfig(config: ProviderConfig) {
 			accessKeyId: config.aws?.accessKey,
 			secretAccessKey: config.aws?.secretKey,
 			sessionToken: config.aws?.sessionToken,
-			credentialProvider: config.aws?.profile,
+			profile: config.aws?.profile,
 			authentication: config.aws?.authentication,
 			endpoint: config.aws?.endpoint,
 			customModelBaseId: config.aws?.customModelBaseId,
