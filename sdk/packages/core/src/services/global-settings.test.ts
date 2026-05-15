@@ -183,6 +183,12 @@ describe("global-settings", () => {
 
 			await writeFile(
 				settingsPath,
+				JSON.stringify({ runCommandsTimeoutMs: 2147483648 }),
+			);
+			expect(readGlobalSettings().runCommandsTimeoutMs).toBe(30000);
+
+			await writeFile(
+				settingsPath,
 				JSON.stringify({ runCommandsTimeoutMs: 120000 }),
 			);
 			expect(readGlobalSettings().runCommandsTimeoutMs).toBe(120000);

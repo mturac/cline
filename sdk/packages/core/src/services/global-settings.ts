@@ -7,6 +7,7 @@ import { captureTelemetryOptOut } from "./telemetry/core-events";
 
 type AgentExtension = NonNullable<AgentConfig["extensions"]>[number];
 type AgentExtensionApi = Parameters<NonNullable<AgentExtension["setup"]>>[0];
+const MAX_RUN_COMMANDS_TIMEOUT_MS = 2147483647;
 
 const GlobalSettingsStringListSchema = z
 	.preprocess(
@@ -38,6 +39,7 @@ export const GlobalSettingsSchema = z
 			.number()
 			.int()
 			.positive()
+			.max(MAX_RUN_COMMANDS_TIMEOUT_MS)
 			.catch(30000)
 			.default(30000),
 	})
