@@ -7,7 +7,7 @@ import {
 	createContributionRegistry,
 	type Message,
 } from "@cline/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MAX_RUN_COMMANDS_TIMEOUT_MS } from "../../extensions/tools/schemas";
 import { TelemetryService } from "../../services/telemetry/TelemetryService";
 import type { CoreSessionConfig } from "../../types/config";
@@ -282,17 +282,8 @@ describe("DefaultRuntimeBuilder", () => {
 	});
 
 	it("sets outer tool timeoutMs to MAX_RUN_COMMANDS_TIMEOUT_MS regardless of configured runCommandsTimeoutMs", async () => {
-		const tempRoot = mkdtempSync(join(tmpdir(), "runtime-builder-timeout-"));
-		const settingsPath = join(tempRoot, "global-settings.json");
-		process.env.CLINE_GLOBAL_SETTINGS_PATH = settingsPath;
-		writeFileSync(
-			settingsPath,
-			JSON.stringify({ runCommandsTimeoutMs: 120000 }, null, 2),
-			"utf8",
-		);
-
 		const runtime = await new DefaultRuntimeBuilder().build({
-			config: makeBaseConfig(),
+			config: makeBaseConfig({ runCommandsTimeoutMs: 120000 }),
 		});
 		const runCommandsTool = runtime.tools.find(
 			(tool) => tool.name === "run_commands",
@@ -301,23 +292,33 @@ describe("DefaultRuntimeBuilder", () => {
 		expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
 	});
 
-	it("defaults invalid runCommandsTimeoutMs in global settings to 30000", async () => {
-		const tempRoot = mkdtempSync(join(tmpdir(), "runtime-builder-timeout-invalid-"));
-		const settingsPath = join(tempRoot, "global-settings.json");
-		process.env.CLINE_GLOBAL_SETTINGS_PATH = settingsPath;
-		writeFileSync(
-			settingsPath,
-			JSON.stringify({ runCommandsTimeoutMs: "oops" }, null, 2),
-			"utf8",
-		);
+	it("passes configured runCommandsTimeoutMs to the run_commands executor", async () => {
+		const bash = vi.fn(async () => "ran");
 
 		const runtime = await new DefaultRuntimeBuilder().build({
-			config: makeBaseConfig(),
+			config: makeBaseConfig({ runCommandsTimeoutMs: 120000 }),
+			toolExecutors: { bash },
 		});
 		const runCommandsTool = runtime.tools.find(
 			(tool) => tool.name === "run_commands",
 		);
-		expect(runCommandsTool?.timeoutMs).toBe(MAX_RUN_COMMANDS_TIMEOUT_MS);
+		expect(runCommandsTool).toBeDefined();
+		if (!runCommandsTool) {
+			throw new Error("Expected run_commands tool.");
+		}
+
+		await runCommandsTool.execute({ commands: ["echo hi"] } as never, {
+			agentId: "agent-1",
+			conversationId: "conv-1",
+			iteration: 1,
+		});
+
+		expect(bash).toHaveBeenCalledWith(
+			"echo hi",
+			process.cwd(),
+			expect.objectContaining({ agentId: "agent-1" }),
+			120000,
+		);
 	});
 
 	it("adds spawn tool when enabled", async () => {
