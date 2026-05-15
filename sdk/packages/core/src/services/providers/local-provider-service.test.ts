@@ -1356,6 +1356,22 @@ describe("getProviderConfigFields", () => {
 		expect(result.authMethod).toBe("api-key");
 	});
 
+	it("returns api-key auth with awsRegion, apiKey, and awsProfile for bedrock", () => {
+		const result = getProviderConfigFields("bedrock");
+		expect(result.providerId).toBe("bedrock");
+		expect(result.authMethod).toBe("api-key");
+		expect(result.description).toMatch(/AWS region/i);
+		expect(Object.keys(result.fields)).toEqual([
+			"awsRegion",
+			"apiKey",
+			"awsProfile",
+		]);
+		expect(result.fields.awsRegion?.label).toBe("AWS Region");
+		expect(result.fields.awsRegion?.placeholder).toBe("us-east-1");
+		expect(result.fields.apiKey?.optional).toBe(true);
+		expect(result.fields.awsProfile?.optional).toBe(true);
+	});
+
 	it("falls back to a single api-key field for unknown providers", () => {
 		const result = getProviderConfigFields("not-a-real-provider");
 		expect(result.authMethod).toBe("api-key");

@@ -2,6 +2,7 @@ import {
 	getLocalProviderModels,
 	getProviderConfigFields,
 	listLocalProviders,
+	type ProviderConfigFieldKey,
 	type ProviderConfigFields,
 	ProviderSettingsManager,
 	refreshProviderModelsFromSource,
@@ -9,6 +10,7 @@ import {
 	saveLocalProviderSettings,
 } from "@cline/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resolveAwsRegion } from "../../../utils/aws-region";
 import {
 	type CodexCliStatus,
 	checkCodexCliInstalled,
@@ -45,7 +47,13 @@ import {
 	toProviderEntry,
 } from "./model";
 
-type ByoFieldKey = "apiKey" | "baseUrl";
+/** Render order for cycling focus with Tab. */
+const FIELD_ORDER: ProviderConfigFieldKey[] = [
+	"awsRegion",
+	"baseUrl",
+	"apiKey",
+	"awsProfile",
+];
 
 const CUSTOM_MODEL_ID_ACTION = "__custom_model_id__";
 
@@ -72,9 +80,12 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 	const [byoFields, setByoFields] = useState<ProviderConfigFields["fields"]>(
 		{},
 	);
-	const [byoApiKey, setByoApiKey] = useState("");
-	const [byoBaseUrl, setByoBaseUrl] = useState("");
-	const [byoFocusedField, setByoFocusedField] = useState<ByoFieldKey>("apiKey");
+	const [byoDescription, setByoDescription] = useState<string | undefined>();
+	const [byoValues, setByoValues] = useState<
+		Partial<Record<ProviderConfigFieldKey, string>>
+	>({});
+	const [byoFocusedField, setByoFocusedField] =
+		useState<ProviderConfigFieldKey>("apiKey");
 	const [codexCliStatus, setCodexCliStatus] = useState<
 		CodexCliStatus | undefined
 	>();
@@ -353,17 +364,37 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 			setActiveProviderId(provider.id);
 			setActiveProviderName(provider.name);
 			setByoFields(config.fields);
-			setByoApiKey("");
-			setByoBaseUrl(
-				providerSettingsManager
-					.getProviderSettings(provider.id)
-					?.baseUrl?.trim() ??
+			setByoDescription(config.description);
+
+			// Build initial values from existing settings
+			const existing = providerSettingsManager.getProviderSettings(provider.id);
+			const initialValues: Partial<Record<ProviderConfigFieldKey, string>> = {};
+			if (config.fields.baseUrl) {
+				initialValues.baseUrl =
+					existing?.baseUrl?.trim() ??
 					config.fields.baseUrl?.defaultValue ??
-					"",
+					"";
+			}
+			if (config.fields.awsRegion) {
+				const existingProfile = existing?.aws?.profile?.trim() ?? "";
+				initialValues.awsRegion =
+					existing?.aws?.region?.trim() ||
+					resolveAwsRegion({ profile: existingProfile }) ||
+					"us-east-1";
+			}
+			if (config.fields.apiKey) {
+				initialValues.apiKey = existing?.apiKey?.trim() ?? "";
+			}
+			if (config.fields.awsProfile) {
+				initialValues.awsProfile = existing?.aws?.profile?.trim() ?? "";
+			}
+			setByoValues(initialValues);
+
+			// Focus the first visible field
+			const firstField = FIELD_ORDER.find(
+				(k) => config.fields[k] !== undefined,
 			);
-			// Focus base URL first when present (local-server users land on
-			// the actionable input). Cloud providers see only `apiKey`.
-			setByoFocusedField(config.fields.baseUrl ? "baseUrl" : "apiKey");
+			setByoFocusedField(firstField ?? "apiKey");
 			setStep("byo_apikey");
 		},
 		[providers, startOAuthFlow, refreshCodexCliStatus, providerSettingsManager],
@@ -388,15 +419,26 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		// No required-field validation. If credentials are missing or wrong,
 		// the provider's own auth response is the authoritative error and is
 		// surfaced when the model picker / first turn runs.
+		const apiKey = byoValues.apiKey?.trim();
+		const awsRegion = byoValues.awsRegion?.trim();
+		const awsProfile = byoValues.awsProfile?.trim();
+		const hasAwsFields = byoFields.awsRegion || byoFields.awsProfile;
+
 		saveLocalProviderSettings(providerSettingsManager, {
 			providerId: activeProviderId,
-			apiKey: byoFields.apiKey ? byoApiKey.trim() : undefined,
-			baseUrl: byoFields.baseUrl ? byoBaseUrl.trim() : undefined,
+			apiKey: byoFields.apiKey ? apiKey : undefined,
+			baseUrl: byoFields.baseUrl ? byoValues.baseUrl?.trim() : undefined,
+			aws: hasAwsFields
+				? {
+						region: awsRegion || "us-east-1",
+						authentication: apiKey ? "api-key" : "profile",
+						profile: apiKey ? undefined : awsProfile || undefined,
+					}
+				: undefined,
 		});
 		transitionToModelPicker(activeProviderId);
 	}, [
-		byoApiKey,
-		byoBaseUrl,
+		byoValues,
 		byoFields,
 		activeProviderId,
 		providerSettingsManager,
@@ -537,8 +579,8 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		setMenuSelected,
 		resetByoFields: () => {
 			setByoFields({});
-			setByoApiKey("");
-			setByoBaseUrl("");
+			setByoValues({});
+			setByoDescription(undefined);
 		},
 		byoFields,
 		byoFocusedField,
@@ -563,6 +605,7 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		loadModelsForProvider,
 		saveClineModelSelection,
 		saveCodexCliConfig,
+		saveByoConfig,
 		saveModelSelection,
 		saveThinkingLevel,
 	});
@@ -572,10 +615,10 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		authError,
 		authStatus,
 		authUrl,
-		byoApiKey,
-		byoBaseUrl,
+		byoDescription,
 		byoFields,
 		byoFocusedField,
+		byoValues,
 		codexCliChecking,
 		codexCliStatus,
 		clineEntries,
@@ -587,8 +630,9 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		deviceVerifyUrl,
 		customModelError,
 		customModelId,
-		handleByoApiKeyInput: setByoApiKey,
-		handleByoBaseUrlInput: setByoBaseUrl,
+		handleByoFieldInput: (field: ProviderConfigFieldKey, value: string) => {
+			setByoValues((prev) => ({ ...prev, [field]: value }));
+		},
 		handleCustomModelIdInput: (value: string) => {
 			setCustomModelId(value);
 			setCustomModelError("");
